@@ -1,0 +1,45 @@
+name: vehicle_tracker
+description: A vehicle business tracking app using Flutter and Supabase.
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.1.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase
+  supabase_flutter: ^1.10.14
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Date formatting
+  intl: ^0.18.1
+
+  # UI components
+  flutter_hooks: ^0.20.5
+  hooks_riverpod: ^2.5.1
+
+  # Charts for dashboard
+  fl_chart: ^0.65.0
+
+  # PDF generation (optional for reports)
+  pdf: ^3.10.4
+  printing: ^5.12.0
+
+  # Others
+  uuid: ^4.1.0
+  go_router: ^14.1.0 # Navigation
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
