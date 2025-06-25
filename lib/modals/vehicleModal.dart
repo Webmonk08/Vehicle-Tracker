@@ -11,11 +11,11 @@ class Vehicle {
 
   factory Vehicle.fromMap(Map<String, dynamic> map) => Vehicle(
         id: map['id'], // read from Supabase or map
-        vehicleNo: map['vehicle_no'] ?? "",
+        vehicleNo: map['VehicleNo'] ?? "",
       );
 
   Map<String, dynamic> toMap() => {
         'id': id,
-        'vehicle_no': vehicleNo,
+        'VehicleNo': vehicleNo,
       };
 }

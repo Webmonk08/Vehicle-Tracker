@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:my_app/modals/vehiclemodal.dart';
-import 'package:my_app/data/vehicleData.dart';
+import 'package:my_app/modals/vehicleModal.dart';
+import 'package:my_app/data/vehicledata.dart';
 import 'package:my_app/service/supabaseService.dart';
 
 class Homepage extends StatefulWidget {
+  const Homepage({super.key});
+
   @override
   _VehicleTrackingPageState createState() => _VehicleTrackingPageState();
 }
@@ -12,23 +14,31 @@ class Homepage extends StatefulWidget {
 class _VehicleTrackingPageState extends State<Homepage> {
   List<Vehicle> vehicles = [];
   final Uuid uuid = Uuid();
+  final Vehicledata vehicleInstance = Vehicledata();
 
   @override
   void initState() {
     super.initState();
+    print("Initializing Vehicle Tracking Page...");
     loadvehicles();
   }
 
   Future<void> loadvehicles() async {
+    print("Starting to load vehicles...");
     try {
       final loadedvehicles = await vehicleInstance.getVehicles();
+      print("Raw loaded vehicles: $loadedvehicles");
+      print("Vehicles count: ${loadedvehicles.length}");
+
       setState(() {
         vehicles = loadedvehicles;
       });
-    } catch (e) {
+      print("State updated with ${vehicles.length} vehicles");
+    } catch (e, stackTrace) {
       print('Error loading vehicles: $e');
+      print('Stack trace: $stackTrace');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load vehicles')),
+        SnackBar(content: Text('Failed to load vehicles: ${e.toString()}')),
       );
     }
   }
@@ -39,20 +49,18 @@ class _VehicleTrackingPageState extends State<Homepage> {
       builder: (context) => AddEditVehicleDialog(
         vehicle: vehicle,
         onSave: (Vehicle newVehicle) async {
-          try{
+          try {
             if (vehicle == null) {
               await vehicleInstance.addvehicle(newVehicle);
               vehicles.add(newVehicle);
-            }
-            else{
-              await vehicleInstance.UpdateVehicle(vehicle.id, newVehicle);
+            } else {
+              await vehicleInstance.updateVehicle(vehicle.id, newVehicle);
               int index = vehicles.indexWhere((v) => v.id == vehicle.id);
               if (index != -1) {
                 vehicles[index] = newVehicle;
               }
             }
-          }
-          catch(e){
+          } catch (e) {
             print('object : $e');
           }
           setState(() {});
@@ -61,29 +69,62 @@ class _VehicleTrackingPageState extends State<Homepage> {
     );
   }
 
-  void _deleteVehicle(String id) {
-    showDialog(
+  void _deleteVehicle(String id) async {
+    // Find the vehicle to show its name in the confirmation
+    final vehicle = vehicles.firstWhere((v) => v.id == id);
+
+    final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Vehicle'),
-        content: const Text('Are you sure you want to delete this vehicle?'),
+        content: Text(
+          'Are you sure you want to delete "${vehicle.vehicleNo}"?',
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                vehicles.removeWhere((v) => v.id == id);
-              });
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      try {
+        // Show loading
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Deleting vehicle...')));
+
+        // Delete from database
+        await vehicleInstance.deleteVehicle(id);
+
+        // Update local state
+        setState(() {
+          vehicles.removeWhere((v) => v.id == id);
+        });
+
+        // Show success
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vehicle deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        print('Error deleting vehicle: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete vehicle: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -184,11 +225,6 @@ class _VehicleTrackingPageState extends State<Homepage> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SizedBox(height: 4),
-                              Text(
-                                'Type: ${vehicle.type ?? 'Not specified'}',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
                               SizedBox(height: 2),
                               Text(
                                 'ID: ${vehicle.id.substring(0, 8)}...',
@@ -209,8 +245,10 @@ class _VehicleTrackingPageState extends State<Homepage> {
                               ),
                               IconButton(
                                 onPressed: () => _deleteVehicle(vehicle.id),
-                                icon:
-                                    Icon(Icons.delete, color: Colors.red[600]),
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: Colors.red[600],
+                                ),
                                 tooltip: 'Delete Vehicle',
                               ),
                             ],
@@ -230,10 +268,7 @@ class AddEditVehicleDialog extends StatefulWidget {
   final Vehicle? vehicle;
   final Function(Vehicle) onSave;
 
-  const AddEditVehicleDialog({super.key, 
-    this.vehicle,
-    required this.onSave,
-  });
+  const AddEditVehicleDialog({super.key, this.vehicle, required this.onSave});
 
   @override
   _AddEditVehicleDialogState createState() => _AddEditVehicleDialogState();
@@ -282,7 +317,7 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
-              controller: _vehicleNoController,
+              controller: _VehicleNoController,
               decoration: InputDecoration(
                 labelText: 'Vehicle Number *',
                 hintText: 'e.g., TN01AB1234',
@@ -297,17 +332,7 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
               },
               textCapitalization: TextCapitalization.characters,
             ),
-            SizedBox(height: 16),
-            TextFormField(
-              controller: _typeController,
-              decoration: InputDecoration(
-                labelText: 'Vehicle Type (Optional)',
-                hintText: 'e.g., Car, Truck, Bus',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.category),
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
+
             if (isEditing) ...[
               const SizedBox(height: 16),
               Container(

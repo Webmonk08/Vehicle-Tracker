@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/modals/DriverModal.dart';
+import 'package:my_app/data/driverdata.dart';
 import 'package:uuid/uuid.dart';
-
 
 class DriverPage extends StatefulWidget {
   const DriverPage({super.key});
@@ -13,15 +13,28 @@ class DriverPage extends StatefulWidget {
 class _DriverPageState extends State<DriverPage> {
   List<Driver> drivers = [];
   final Uuid uuid = const Uuid();
+  final Driverdata driverInstance = Driverdata();
 
   @override
   void initState() {
     super.initState();
     // Sample drivers
-    drivers = [
-      Driver(id: uuid.v4(), name: 'Driver 1', PhoneNo: '9876543210'),
-      Driver(id: uuid.v4(), name: 'Driver 2', PhoneNo: '9123456780'),
-    ];
+    loaddrivers();
+  }
+
+  Future<void> loaddrivers() async {
+    try {
+      final loadeddrivers = await driverInstance.getDrivers();
+
+      setState(() {
+        drivers = loadeddrivers;
+        print("Loaded Drivers: $drivers");
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load vehicles: ${e.toString()}')),
+      );
+    }
   }
 
   void _showAddEditDialog([Driver? driver]) {
@@ -29,45 +42,80 @@ class _DriverPageState extends State<DriverPage> {
       context: context,
       builder: (context) => AddEditDriverDialog(
         driver: driver,
-        onSave: (Driver newDriver) {
-          setState(() {
+        onSave: (Driver newDriver) async {
+          try {
             if (driver == null) {
+              await driverInstance.addDriver(newDriver);
               drivers.add(newDriver);
             } else {
+              await driverInstance.updateDriver(driver.id, newDriver);
               int index = drivers.indexWhere((d) => d.id == driver.id);
               if (index != -1) {
                 drivers[index] = newDriver;
               }
             }
-          });
+          } catch (e) {
+            print("Error: $e");
+          }
+          setState(() {});
         },
       ),
     );
   }
 
-  void _deleteDriver(String id) {
-    showDialog(
+  void _deleteDriver(String id) async {
+    final driver = drivers.firstWhere((v) => v.id == id);
+
+    final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Driver'),
-        content: const Text('Are you sure you want to delete this driver?'),
+        title: const Text('Delete Vehicle'),
+        content: Text('Are you sure you want to delete "${driver.name}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                drivers.removeWhere((d) => d.id == id);
-              });
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      try {
+        // Show loading
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Deleting vehicle...')));
+
+        // Delete from database
+        await driverInstance.deleteDriver(id);
+
+        // Update local state
+        setState(() {
+          drivers.removeWhere((v) => v.id == id);
+        });
+
+        // Show success
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vehicle deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        print('Error deleting vehicle: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete vehicle: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -110,19 +158,26 @@ class _DriverPageState extends State<DriverPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_outline,
-                            size: 64, color: Colors.grey[400]),
+                        Icon(
+                          Icons.person_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'No drivers added yet',
-                          style:
-                              TextStyle(fontSize: 16, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Tap the "Add Driver" button to get started',
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[500]),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
                         ),
                       ],
                     ),
@@ -143,39 +198,50 @@ class _DriverPageState extends State<DriverPage> {
                               color: Colors.blue[100],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Icon(Icons.person,
-                                color: Colors.blue[700], size: 24),
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.blue[700],
+                              size: 24,
+                            ),
                           ),
                           title: Text(
                             driver.name,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 16),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
-                              Text('PhoneNo: ${driver.PhoneNo}',
-                                  style: TextStyle(color: Colors.grey[600])),
+                              Text(
+                                'PhoneNo: ${driver.PhoneNo}',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
                               const SizedBox(height: 2),
-                              Text('ID: ${driver.id.substring(0, 8)}...',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[500])),
+                              Text(
+                                'ID: ${driver.id.substring(0, 8)}...',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
                             ],
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: Icon(Icons.edit,
-                                    color: Colors.blue[600]),
+                                icon: Icon(Icons.edit, color: Colors.blue[600]),
                                 onPressed: () => _showAddEditDialog(driver),
                                 tooltip: 'Edit Driver',
                               ),
                               IconButton(
-                                icon: Icon(Icons.delete,
-                                    color: Colors.red[600]),
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: Colors.red[600],
+                                ),
                                 onPressed: () => _deleteDriver(driver.id),
                                 tooltip: 'Delete Driver',
                               ),
@@ -211,10 +277,10 @@ class _AddEditDriverDialogState extends State<AddEditDriverDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.driver?.name ?? '');
-    _PhoneNoController =
-        TextEditingController(text: widget.driver?.PhoneNo ?? '');
+    _nameController = TextEditingController(text: widget.driver?.name ?? '');
+    _PhoneNoController = TextEditingController(
+      text: widget.driver?.PhoneNo ?? '',
+    );
   }
 
   @override
@@ -289,8 +355,7 @@ class _AddEditDriverDialogState extends State<AddEditDriverDialog> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.fingerprint,
-                        size: 16, color: Colors.grey[600]),
+                    Icon(Icons.fingerprint, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 
 class Driver {
   final String id;
@@ -5,13 +6,13 @@ class Driver {
   final String PhoneNo;
 
   Driver({
-    required this.id,
+    String? id,
     required this.name,
     required this.PhoneNo,
-  });
+  }): id = id ?? const Uuid().v4();
 
   factory Driver.fromMap(Map<String, dynamic> map) => Driver(
-        id: map['id'] ?? "",
+        id: map['id'],
         name: map['name'] ?? "",
         PhoneNo: map['PhoneNo'] ?? "",
       );

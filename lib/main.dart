@@ -3,18 +3,14 @@ import 'pages/Dashboard/Dashboard.dart';
 import 'pages/DriverPage/Driverpage.dart';
 import 'pages/vehiclePage/Homepage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load();
-  print('URL: ${dotenv.env['SUPABASEURL']}');
-  print('KEY: ${dotenv.env['SUPABASEKEY']}');
-
   await Supabase.initialize(
-    url: dotenv.env['SUPABASEURL'] ?? '',
-    anonKey: dotenv.env['SUPABASEKEY'] ?? '',
+    url: "https://orbrifejuhbnecjxrjjl.supabase.co",
+    anonKey:
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9yYnJpZmVqdWhibmVjanhyampsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODYzMjg5NSwiZXhwIjoyMDY0MjA4ODk1fQ.o-TTy1N-kmUySoDDqOh6_FFhlPSvI7Oqul2LROsmUv8",
   );
 
   runApp(const MyApp());
@@ -42,21 +38,25 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  Widget _currentPage = const Dashboard();
+  int _selectedIndex = 0;
 
-  void _selectPage(Widget page) {
+  final List<Widget> _pages = [
+    const Dashboard(),
+    const Homepage(),
+    const DriverPage(),
+  ];
+
+  void _selectPage(int index) {
     setState(() {
-      _currentPage = page;
-      Navigator.pop(context); // Close drawer
+      _selectedIndex = index;
+      Navigator.pop(context);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vehicle Tracker'),
-      ),
+      appBar: AppBar(title: const Text('Vehicle Tracker')),
       drawer: Drawer(
         child: ListView(
           children: [
@@ -70,22 +70,22 @@ class _MainPageState extends State<MainPage> {
             ListTile(
               leading: const Icon(Icons.dashboard),
               title: const Text('Dashboard'),
-              onTap: () => _selectPage(const Dashboard()),
+              onTap: () => _selectPage(0),
             ),
             ListTile(
               leading: const Icon(Icons.local_shipping),
               title: const Text('Vehicles'),
-              onTap: () => _selectPage(Homepage()),
+              onTap: () => _selectPage(1),
             ),
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text('Drivers'),
-              onTap: () => _selectPage(const DriverPage()),
+              onTap: () => _selectPage(2),
             ),
           ],
         ),
       ),
-      body: _currentPage,
+      body: _pages[_selectedIndex],
     );
   }
 }
