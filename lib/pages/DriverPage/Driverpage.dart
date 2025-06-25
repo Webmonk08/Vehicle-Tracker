@@ -12,7 +12,8 @@ class DriverPage extends StatefulWidget {
 
 class _DriverPageState extends State<DriverPage> {
   List<Driver> drivers = [];
-  final Uuid uuid = Uuid();
+  final Uuid uuid = const Uuid();
+
   @override
   void initState() {
     super.initState();
@@ -205,7 +206,7 @@ class _AddEditDriverDialogState extends State<AddEditDriverDialog> {
   late TextEditingController _nameController;
   late TextEditingController _PhoneNoController;
   final _formKey = GlobalKey<FormState>();
-  final Uuid uuid = Uuid();
+  final Uuid uuid = const Uuid();
 
   @override
   void initState() {

@@ -5,14 +5,13 @@ import 'package:my_app/data/vehicleData.dart';
 import 'package:my_app/service/supabaseService.dart';
 
 class Homepage extends StatefulWidget {
-
   @override
   _VehicleTrackingPageState createState() => _VehicleTrackingPageState();
 }
 
 class _VehicleTrackingPageState extends State<Homepage> {
   List<Vehicle> vehicles = [];
-  final vehicleInstance = Vehicledata();
+  final Uuid uuid = Uuid();
 
   @override
   void initState() {
@@ -66,12 +65,12 @@ class _VehicleTrackingPageState extends State<Homepage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Vehicle'),
-        content: Text('Are you sure you want to delete this vehicle?'),
+        title: const Text('Delete Vehicle'),
+        content: const Text('Are you sure you want to delete this vehicle?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -80,7 +79,7 @@ class _VehicleTrackingPageState extends State<Homepage> {
               });
               Navigator.pop(context);
             },
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -94,7 +93,7 @@ class _VehicleTrackingPageState extends State<Homepage> {
         children: [
           // Header section
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.blue[50],
               border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
@@ -112,8 +111,8 @@ class _VehicleTrackingPageState extends State<Homepage> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _showAddEditDialog(),
-                  icon: Icon(Icons.add),
-                  label: Text('Add Vehicle'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Vehicle'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue[700],
                     foregroundColor: Colors.white,
@@ -134,7 +133,7 @@ class _VehicleTrackingPageState extends State<Homepage> {
                           size: 64,
                           color: Colors.grey[400],
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           'No vehicles added yet',
                           style: TextStyle(
@@ -142,7 +141,7 @@ class _VehicleTrackingPageState extends State<Homepage> {
                             color: Colors.grey[600],
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           'Tap the "Add Vehicle" button to get started',
                           style: TextStyle(
@@ -154,17 +153,17 @@ class _VehicleTrackingPageState extends State<Homepage> {
                     ),
                   )
                 : ListView.builder(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     itemCount: vehicles.length,
                     itemBuilder: (context, index) {
                       final vehicle = vehicles[index];
                       return Card(
-                        margin: EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 12),
                         elevation: 2,
                         child: ListTile(
-                          contentPadding: EdgeInsets.all(16),
+                          contentPadding: const EdgeInsets.all(16),
                           leading: Container(
-                            padding: EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.blue[100],
                               borderRadius: BorderRadius.circular(8),
@@ -177,7 +176,7 @@ class _VehicleTrackingPageState extends State<Homepage> {
                           ),
                           title: Text(
                             vehicle.vehicleNo,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -185,6 +184,11 @@ class _VehicleTrackingPageState extends State<Homepage> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              SizedBox(height: 4),
+                              Text(
+                                'Type: ${vehicle.type ?? 'Not specified'}',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
                               SizedBox(height: 2),
                               Text(
                                 'ID: ${vehicle.id.substring(0, 8)}...',
@@ -226,7 +230,7 @@ class AddEditVehicleDialog extends StatefulWidget {
   final Vehicle? vehicle;
   final Function(Vehicle) onSave;
 
-  AddEditVehicleDialog({
+  const AddEditVehicleDialog({super.key, 
     this.vehicle,
     required this.onSave,
   });
@@ -238,7 +242,7 @@ class AddEditVehicleDialog extends StatefulWidget {
 class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
   late TextEditingController _VehicleNoController;
   final _formKey = GlobalKey<FormState>();
-  final Uuid uuid = Uuid();
+  final Uuid uuid = const Uuid();
 
   @override
   void initState() {
@@ -278,8 +282,8 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
-              controller: _VehicleNoController,
-              decoration: const InputDecoration(
+              controller: _vehicleNoController,
+              decoration: InputDecoration(
                 labelText: 'Vehicle Number *',
                 hintText: 'e.g., TN01AB1234',
                 border: OutlineInputBorder(),
@@ -294,10 +298,20 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
               textCapitalization: TextCapitalization.characters,
             ),
             SizedBox(height: 16),
+            TextFormField(
+              controller: _typeController,
+              decoration: InputDecoration(
+                labelText: 'Vehicle Type (Optional)',
+                hintText: 'e.g., Car, Truck, Bus',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
             if (isEditing) ...[
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Container(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
@@ -305,7 +319,7 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
                 child: Row(
                   children: [
                     Icon(Icons.fingerprint, size: 16, color: Colors.grey[600]),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'ID: ${widget.vehicle!.id}',
@@ -326,7 +340,7 @@ class _AddEditVehicleDialogState extends State<AddEditVehicleDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text('Cancel'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _saveVehicle,
