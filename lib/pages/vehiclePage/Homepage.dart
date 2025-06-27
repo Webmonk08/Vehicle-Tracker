@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:my_app/modals/vehicleModal.dart';
 import 'package:my_app/data/vehicledata.dart';
-import 'package:my_app/service/supabaseService.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});

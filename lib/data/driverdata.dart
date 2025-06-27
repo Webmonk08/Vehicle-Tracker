@@ -10,7 +10,7 @@ class Driverdata {
       final List<Map<String, dynamic>> data = await supabaseClient
           .from('drivers')
           .select();
-      print("Driver Data : ${data}");
+      print("Driver Data : $data");
       return data.map((item) => Driver.fromMap(item)).toList();
     } catch (e) {
       print('Supabase error: $e');
@@ -35,3 +35,4 @@ class Driverdata {
         .eq('id', id);
   }
 }
+//

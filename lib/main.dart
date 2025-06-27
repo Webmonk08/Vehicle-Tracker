@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/pages/Logpage/logPage.dart';
 import 'pages/Dashboard/Dashboard.dart';
 import 'pages/DriverPage/Driverpage.dart';
 import 'pages/vehiclePage/Homepage.dart';
@@ -44,6 +45,7 @@ class _MainPageState extends State<MainPage> {
     const Dashboard(),
     const Homepage(),
     const DriverPage(),
+    LogPage()
   ];
 
   void _selectPage(int index) {
@@ -82,6 +84,12 @@ class _MainPageState extends State<MainPage> {
               title: const Text('Drivers'),
               onTap: () => _selectPage(2),
             ),
+                        ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('LogPage'),
+              onTap: () => _selectPage(3),
+            ),
+
           ],
         ),
       ),
