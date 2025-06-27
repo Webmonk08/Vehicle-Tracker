@@ -12,6 +12,7 @@ class LogPage extends StatefulWidget {
 class _LogPageState extends State<LogPage> {
   final LogPageData _logPageData = LogPageData();
   List<LogModal> _logs = [];
+  List<LogModal> _filteredLogs = [];
   bool _isLoading = true;
   bool _isAddingLog = false;
 
@@ -30,10 +31,16 @@ class _LogPageState extends State<LogPage> {
   String? _selectedVehicleNo;
   String? _selectedDriverName;
 
+  // Filter variables
+  String? _filterVehicleNo;
+  String? _filterDriverName;
+  String? _filterDate;
+  String? _filterEndDate;
+  bool _isFilterApplied = false;
+
   @override
   void initState() {
     super.initState();
-    print("object");
     _loadLogs();
     _loadDropdownData();
   }
@@ -49,14 +56,15 @@ class _LogPageState extends State<LogPage> {
   Future<void> _loadLogs() async {
     setState(() {
       _isLoading = true;
+      _loadDropdownData();
     });
 
     try {
-      final logs = await _logPageData.getLogs();
+      final logs = await _logPageData.getLogs("", "", "", "", _isFilterApplied);
 
       setState(() {
         _logs = logs;
-        print(_logs.toString());
+        _filteredLogs = logs;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,13 +81,12 @@ class _LogPageState extends State<LogPage> {
     });
 
     try {
-      // You'll need to add these methods to your LogPageData class
+      print("DropDown");
       final vehicleNumbers = await _logPageData.getVehicleNumbers();
       final driverNames = await _logPageData.getDriverNames();
-
-      setState(() async {
-        _vehicleNumbers = vehicleNumbers;
-        _driverNames = driverNames;
+      setState(() {
+        _vehicleNumbers = vehicleNumbers.map((p) => p.toString()).toList();
+        _driverNames = driverNames.map((p) => p.toString()).toList();
         _isLoadingDropdownData = false;
       });
     } catch (e) {
@@ -87,7 +94,382 @@ class _LogPageState extends State<LogPage> {
         _isLoadingDropdownData = false;
       });
       _showErrorSnackBar('Failed to load dropdown data: $e');
+      print('Failed to load dropdown data: $e');
     }
+  }
+
+  void _applyFilters() async {
+    _isFilterApplied =
+        _filterVehicleNo != null ||
+        _filterDriverName != null ||
+        _filterDate != null ||
+        _filterEndDate != null;
+
+        
+    _logs = await _logPageData.getLogs(
+      _filterDate,
+      _filterEndDate,
+      _filterDriverName,
+      _filterVehicleNo,
+      _isFilterApplied,
+    );
+    setState(() {
+      _filteredLogs = _logs.where((log) {
+        bool matchesVehicle =
+            _filterVehicleNo == null || log.vehicleNo == _filterVehicleNo;
+        bool matchesDriver =
+            _filterDriverName == null || log.driverName == _filterDriverName;
+        bool matchesDate = _filterDate == null || log.date == _filterDate;
+
+        return matchesVehicle && matchesDriver && matchesDate;
+      }).toList();
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _filterVehicleNo = null;
+      _filterDriverName = null;
+      _filterDate = null;
+      _filteredLogs = _logs;
+      _isFilterApplied = false;
+    });
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildFilterBottomSheet(),
+    );
+  }
+
+  Widget _buildFilterBottomSheet() {
+    String? tempVehicleNo = _filterVehicleNo;
+    String? tempDriverName = _filterDriverName;
+    String? tempDate = _filterDate;
+    String? tempEndDate = _filterEndDate;
+    final tempDateController = TextEditingController(text: _filterDate);
+    final tempendDateController = TextEditingController(text: _filterEndDate);
+
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Filter Logs',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Filter fields
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // Vehicle Number filter
+                        DropdownButtonFormField<String>(
+                          value: tempVehicleNo,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Vehicle Number',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.directions_car),
+                          ),
+                          hint: const Text('Select Vehicle Number'),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('All Vehicles'),
+                            ),
+                            ..._vehicleNumbers.map<DropdownMenuItem<String>>((
+                              vehicle,
+                            ) {
+                              String vehicleNo = vehicle is Map
+                                  ? vehicle['vehicle_number']?.toString() ??
+                                        vehicle.toString()
+                                  : vehicle.toString();
+                              return DropdownMenuItem<String>(
+                                value: vehicleNo,
+                                child: Text(vehicleNo),
+                              );
+                            }),
+                          ],
+                          onChanged: (String? newValue) {
+                            setModalState(() {
+                              tempVehicleNo = newValue;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Driver Name filter
+                        DropdownButtonFormField<String>(
+                          value: tempDriverName,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Driver Name',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          hint: const Text('Select Driver Name'),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('All Drivers'),
+                            ),
+                            ..._driverNames.map<DropdownMenuItem<String>>((
+                              driver,
+                            ) {
+                              String driverName = driver is Map
+                                  ? driver['driver_name']?.toString() ??
+                                        driver.toString()
+                                  : driver.toString();
+                              return DropdownMenuItem<String>(
+                                value: driverName,
+                                child: Text(driverName),
+                              );
+                            }),
+                          ],
+                          onChanged: (String? newValue) {
+                            setModalState(() {
+                              tempDriverName = newValue;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Date filter
+                        TextFormField(
+                          controller: tempDateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Date',
+                            hintText: 'Select date to filter',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.calendar_today),
+                            suffixIcon: Icon(Icons.clear),
+                          ),
+                          onTap: () async {
+                            DateTime? pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2101),
+                            );
+                            if (pickedDate != null) {
+                              String formattedDate =
+                                  "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                              setModalState(() {
+                                tempDate = formattedDate;
+                                tempDateController.text = formattedDate;
+                              });
+                            }
+                          },
+                          readOnly: true,
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: tempendDateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Filter by Date',
+                            hintText: 'Select End date to filter',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.calendar_today),
+                            suffixIcon: Icon(Icons.clear),
+                          ),
+                          onTap: () async {
+                            DateTime? pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2101),
+                            );
+                            if (pickedDate != null) {
+                              String formattedDate =
+                                  "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                              setModalState(() {
+                                tempEndDate = formattedDate;
+                                tempendDateController.text = formattedDate;
+                              });
+                            }
+                          },
+                          readOnly: true,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Clear filters button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setModalState(() {
+                                tempVehicleNo = null;
+                                tempDriverName = null;
+                                tempDate = null;
+                                tempDateController.clear();
+                                tempendDateController.clear();
+                              });
+                            },
+                            child: const Text('Clear All Filters'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Apply button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _filterVehicleNo = tempVehicleNo;
+                        _filterDriverName = tempDriverName;
+                        _filterDate = tempDate;
+                        _filterEndDate = tempEndDate;
+                      });
+                      _applyFilters();
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Apply Filters',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChips() {
+    List<Widget> chips = [];
+
+    if (_filterVehicleNo != null) {
+      chips.add(
+        Chip(
+          label: Text('Vehicle: $_filterVehicleNo'),
+          onDeleted: () {
+            setState(() {
+              _filterVehicleNo = null;
+            });
+            _applyFilters();
+          },
+          backgroundColor: Colors.blue.withOpacity(0.1),
+        ),
+      );
+    }
+
+    if (_filterDriverName != null) {
+      chips.add(
+        Chip(
+          label: Text('Driver: $_filterDriverName'),
+          onDeleted: () {
+            setState(() {
+              _filterDriverName = null;
+            });
+            _applyFilters();
+          },
+          backgroundColor: Colors.green.withOpacity(0.1),
+        ),
+      );
+    }
+
+    if (_filterDate != null) {
+      chips.add(
+        Chip(
+          label: Text('Start-Date: $_filterDate'),
+          onDeleted: () {
+            setState(() {
+              _filterDate = null;
+            });
+            _applyFilters();
+          },
+          backgroundColor: Colors.orange.withOpacity(0.1),
+        ),
+      );
+    }
+    if (_filterEndDate != null) {
+      chips.add(
+        Chip(
+          label: Text('End-Date: $_filterEndDate'),
+          onDeleted: () {
+            setState(() {
+              _filterEndDate = null;
+            });
+            _applyFilters();
+          },
+          backgroundColor: Colors.orange.withOpacity(0.1),
+        ),
+      );
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Active Filters:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: _clearFilters,
+                child: const Text('Clear All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 4, children: chips),
+        ],
+      ),
+    );
   }
 
   Future<void> _addNewLog() async {
@@ -106,13 +488,9 @@ class _LogPageState extends State<LogPage> {
         description: _descriptionController.text,
       );
 
-      // Clear form
       _clearForm();
 
-      // Reload logs
       await _loadLogs();
-
-      // Close bottom sheet
       Navigator.of(context).pop();
 
       _showSuccessSnackBar('Log added successfully!');
@@ -368,7 +746,6 @@ class _LogPageState extends State<LogPage> {
   }
 
   Widget _buildLogCard(LogModal log) {
-    print(log.cost_of_load);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -469,46 +846,97 @@ class _LogPageState extends State<LogPage> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            onPressed: _showFilterBottomSheet,
+            icon: Stack(
+              children: [
+                const Icon(Icons.filter_list),
+                if (_isFilterApplied)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'Filter',
+          ),
+          IconButton(
             onPressed: _loadLogs,
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _logs.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 80,
-                    color: Colors.grey,
+      body: Column(
+        children: [
+          // Filter chips
+          if (_isFilterApplied) _buildFilterChips(),
+
+          // Main content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredLogs.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _isFilterApplied
+                              ? Icons.search_off
+                              : Icons.description_outlined,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _isFilterApplied
+                              ? 'No logs match your filters'
+                              : 'No logs found',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isFilterApplied
+                              ? 'Try adjusting your filter criteria'
+                              : 'Add your first log by tapping the + button',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        if (_isFilterApplied) ...[
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _clearFilters,
+                            child: const Text('Clear Filters'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadLogs,
+                    child: ListView.builder(
+                      itemCount: _filteredLogs.length,
+                      itemBuilder: (context, index) {
+                        return _buildLogCard(_filteredLogs[index]);
+                      },
+                    ),
                   ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No logs found',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Add your first log by tapping the + button',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadLogs,
-              child: ListView.builder(
-                itemCount: _logs.length,
-                itemBuilder: (context, index) {
-                  return _buildLogCard(_logs[index]);
-                },
-              ),
-            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddLogBottomSheet,
         backgroundColor: Colors.blue,
