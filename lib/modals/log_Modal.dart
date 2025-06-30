@@ -2,7 +2,7 @@ class LogModal {
   final String date;
   final String vehicleNo;
   final String driverName;
-  final double cost_of_load;  // Changed to double
+  final double cost_of_load; // Changed to double
   final String description;
 
   LogModal({
@@ -16,17 +16,17 @@ class LogModal {
   factory LogModal.fromMap(Map<String, dynamic> map) {
     return LogModal(
       date: map['log_date']?.toString() ?? '',
-            description: map['description']?.toString() ?? '',
+      description: map['description']?.toString() ?? '',
 
       // Handle cost_of_load - convert int/double to double
       cost_of_load: _parseToDouble(map['cost_of_load']),
-      
+
       // Handle nested objects
-      vehicleNo: map['vehicles'] != null 
-          ? (map['vehicles']['VehicleNo']?.toString() ?? '') 
+      vehicleNo: map['vehicles'] != null
+          ? (map['vehicles']['VehicleNo']?.toString() ?? '')
           : '',
-      driverName: map['drivers'] != null 
-          ? (map['drivers']['name']?.toString() ?? '') 
+      driverName: map['drivers'] != null
+          ? (map['drivers']['name']?.toString() ?? '')
           : '',
     );
   }

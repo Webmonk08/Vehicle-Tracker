@@ -50,8 +50,10 @@ class LogPageData {
             cost_of_load,
             description,
             log_date,
-            vehicles(VehicleNo),
-            drivers(name)
+            vehicle_id,
+            driver_id,
+            vehicles!inner(VehicleNo),
+            drivers!inner(name)
           ''');
 
       if (isFilterApplied) {
@@ -68,13 +70,13 @@ class LogPageData {
         // Apply vehicle filter only if vehicleNo is provided
         if (vehicleNo != null && vehicleNo.isNotEmpty) {
           print('Applying vehicle filter: $vehicleNo');
-          query = query.filter('vehicles.VehicleNo', 'eq', vehicleNo);
+          query = query.eq('vehicles.VehicleNo', vehicleNo);
         }
 
         // Apply driver filter only if driverName is provided
         if (driverName != null && driverName.isNotEmpty) {
           print('Applying driver filter: $driverName');
-          query = query.filter('drivers.name', 'eq', driverName);
+          query = query.eq('drivers.name', driverName);
         }
       }
 
@@ -86,12 +88,10 @@ class LogPageData {
       print('Response count: ${response.length}');
 
       // Print first few log_dates to see what's actually in the DB
-      if (response.isNotEmpty) {
-        print('Sample log_dates from response:');
-        for (int i = 0; i < (response.length > 5 ? 5 : response.length); i++) {
-          print('  ${i + 1}: ${response[i]}');
-        }
+      for (var log in response) {
+        print("Log entry: $log");
       }
+      print("");
 
       return response.map((row) {
         final safeRow = <String, dynamic>{
@@ -150,7 +150,7 @@ class LogPageData {
     return value.toString();
   }
 
-  Future<void> addLog({
+  Future<bool> addLog({
     required String date,
     required String vehicleNo,
     required String driverName,
@@ -158,43 +158,54 @@ class LogPageData {
     required String description,
   }) async {
     try {
-      final dynamic vehicleId;
-      final dynamic driverId;
-      print(vehicleNo);
-      final vehicleres = await supabaseClient
+      int? vehicleId;
+      int? driverId;
+
+      print('Adding log for vehicle: $vehicleNo');
+
+      // Get vehicle ID
+      final vehicleRes = await supabaseClient
           .from('vehicles')
           .select('id')
           .eq('VehicleNo', vehicleNo)
           .maybeSingle();
-      if (vehicleres == null) {
-        print("❌ No vehicle found with that number");
-        return;
+
+      if (vehicleRes == null) {
+        print("❌ No vehicle found with number: $vehicleNo");
+        return false;
       } else {
-        vehicleId = vehicleres['id'];
+        vehicleId = vehicleRes['id'] as int;
       }
 
-      final driverres = await supabaseClient
+      // Get driver ID
+      final driverRes = await supabaseClient
           .from('drivers')
           .select('id')
           .eq('name', driverName)
           .maybeSingle();
-      if (driverres != null) {
-        driverId = driverres['id'];
+
+      if (driverRes == null) {
+        print("❌ No driver found with name: $driverName");
+        return false;
       } else {
-        print("❌ No driver found with that name");
-        return;
+        driverId = driverRes['id'] as int;
       }
 
-      final newLog = LogModal(
-        date: date,
-        vehicleNo: vehicleId.toString(),
-        driverName: driverId.toString(),
-        cost_of_load: cost,
-        description: description,
-      );
-      await supabaseClient.from('vehicle_logs').insert(newLog.toMap());
+      // Insert the log
+      final logData = {
+        'log_date': date,
+        'vehicle_id': vehicleId,
+        'driver_id': driverId,
+        'cost_of_load': cost,
+        'description': description,
+      };
+
+      await supabaseClient.from('vehicle_logs').insert(logData);
+      print('✅ Log added successfully');
+      return true;
     } catch (e) {
-      print('Error adding new log: $e');
+      print('❌ Error adding new log: $e');
+      return false;
     }
   }
 }

@@ -12,13 +12,12 @@ class LogPage extends StatefulWidget {
 class _LogPageState extends State<LogPage> {
   final LogPageData _logPageData = LogPageData();
   List<LogModal> _logs = [];
-  List<LogModal> _filteredLogs = [];
   bool _isLoading = true;
   bool _isAddingLog = false;
 
   // Dropdown data
-  List<dynamic> _vehicleNumbers = [];
-  List<dynamic> _driverNames = [];
+  List<String> _vehicleNumbers = [];
+  List<String> _driverNames = [];
   bool _isLoadingDropdownData = false;
 
   // Form controllers
@@ -56,15 +55,19 @@ class _LogPageState extends State<LogPage> {
   Future<void> _loadLogs() async {
     setState(() {
       _isLoading = true;
-      _loadDropdownData();
     });
 
     try {
-      final logs = await _logPageData.getLogs("", "", "", "", _isFilterApplied);
+      final logs = await _logPageData.getLogs(
+        _filterDate, 
+        _filterEndDate, 
+        _filterDriverName, 
+        _filterVehicleNo, 
+        _isFilterApplied
+      );
 
       setState(() {
         _logs = logs;
-        _filteredLogs = logs;
         _isLoading = false;
       });
     } catch (e) {
@@ -81,12 +84,13 @@ class _LogPageState extends State<LogPage> {
     });
 
     try {
-      print("DropDown");
+      print("Loading dropdown data...");
       final vehicleNumbers = await _logPageData.getVehicleNumbers();
       final driverNames = await _logPageData.getDriverNames();
+      
       setState(() {
-        _vehicleNumbers = vehicleNumbers.map((p) => p.toString()).toList();
-        _driverNames = driverNames.map((p) => p.toString()).toList();
+        _vehicleNumbers = vehicleNumbers;
+        _driverNames = driverNames;
         _isLoadingDropdownData = false;
       });
     } catch (e) {
@@ -98,32 +102,29 @@ class _LogPageState extends State<LogPage> {
     }
   }
 
-  void _applyFilters() async {
-    _isFilterApplied =
-        _filterVehicleNo != null ||
-        _filterDriverName != null ||
-        _filterDate != null ||
-        _filterEndDate != null;
+  Future<void> _applyFilters() async {
+    setState(() {
+      _isLoading = true;
+      _isFilterApplied = _filterVehicleNo != null ||
+          _filterDriverName != null ||
+          _filterDate != null ||
+          _filterEndDate != null;
+    });
 
-        
-    _logs = await _logPageData.getLogs(
+    final logs = await _logPageData.getLogs(
       _filterDate,
       _filterEndDate,
       _filterDriverName,
       _filterVehicleNo,
       _isFilterApplied,
     );
+    
     setState(() {
-      _filteredLogs = _logs.where((log) {
-        bool matchesVehicle =
-            _filterVehicleNo == null || log.vehicleNo == _filterVehicleNo;
-        bool matchesDriver =
-            _filterDriverName == null || log.driverName == _filterDriverName;
-        bool matchesDate = _filterDate == null || log.date == _filterDate;
-
-        return matchesVehicle && matchesDriver && matchesDate;
-      }).toList();
+      _logs = logs;
+      _isLoading = false;
     });
+    
+    print("Filtered logs count: ${_logs.length}");
   }
 
   void _clearFilters() {
@@ -131,9 +132,10 @@ class _LogPageState extends State<LogPage> {
       _filterVehicleNo = null;
       _filterDriverName = null;
       _filterDate = null;
-      _filteredLogs = _logs;
+      _filterEndDate = null;
       _isFilterApplied = false;
     });
+    _loadLogs();
   }
 
   void _showFilterBottomSheet() {
@@ -151,7 +153,7 @@ class _LogPageState extends State<LogPage> {
     String? tempDate = _filterDate;
     String? tempEndDate = _filterEndDate;
     final tempDateController = TextEditingController(text: _filterDate);
-    final tempendDateController = TextEditingController(text: _filterEndDate);
+    final tempEndDateController = TextEditingController(text: _filterEndDate);
 
     return StatefulBuilder(
       builder: (context, setModalState) {
@@ -212,13 +214,7 @@ class _LogPageState extends State<LogPage> {
                               value: null,
                               child: Text('All Vehicles'),
                             ),
-                            ..._vehicleNumbers.map<DropdownMenuItem<String>>((
-                              vehicle,
-                            ) {
-                              String vehicleNo = vehicle is Map
-                                  ? vehicle['vehicle_number']?.toString() ??
-                                        vehicle.toString()
-                                  : vehicle.toString();
+                            ..._vehicleNumbers.map<DropdownMenuItem<String>>((vehicleNo) {
                               return DropdownMenuItem<String>(
                                 value: vehicleNo,
                                 child: Text(vehicleNo),
@@ -247,13 +243,7 @@ class _LogPageState extends State<LogPage> {
                               value: null,
                               child: Text('All Drivers'),
                             ),
-                            ..._driverNames.map<DropdownMenuItem<String>>((
-                              driver,
-                            ) {
-                              String driverName = driver is Map
-                                  ? driver['driver_name']?.toString() ??
-                                        driver.toString()
-                                  : driver.toString();
+                            ..._driverNames.map<DropdownMenuItem<String>>((driverName) {
                               return DropdownMenuItem<String>(
                                 value: driverName,
                                 child: Text(driverName),
@@ -268,15 +258,25 @@ class _LogPageState extends State<LogPage> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Date filter
+                        // Start Date filter
                         TextFormField(
                           controller: tempDateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Filter by Date',
-                            hintText: 'Select date to filter',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                            suffixIcon: Icon(Icons.clear),
+                          decoration: InputDecoration(
+                            labelText: 'Start Date',
+                            hintText: 'Select start date to filter',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            suffixIcon: tempDate != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        tempDate = null;
+                                        tempDateController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
                           ),
                           onTap: () async {
                             DateTime? pickedDate = await showDatePicker(
@@ -296,15 +296,27 @@ class _LogPageState extends State<LogPage> {
                           },
                           readOnly: true,
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+                        
+                        // End Date filter
                         TextFormField(
-                          controller: tempendDateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Filter by Date',
-                            hintText: 'Select End date to filter',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                            suffixIcon: Icon(Icons.clear),
+                          controller: tempEndDateController,
+                          decoration: InputDecoration(
+                            labelText: 'End Date',
+                            hintText: 'Select end date to filter',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.calendar_today),
+                            suffixIcon: tempEndDate != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        tempEndDate = null;
+                                        tempEndDateController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
                           ),
                           onTap: () async {
                             DateTime? pickedDate = await showDatePicker(
@@ -318,7 +330,7 @@ class _LogPageState extends State<LogPage> {
                                   "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
                               setModalState(() {
                                 tempEndDate = formattedDate;
-                                tempendDateController.text = formattedDate;
+                                tempEndDateController.text = formattedDate;
                               });
                             }
                           },
@@ -335,8 +347,9 @@ class _LogPageState extends State<LogPage> {
                                 tempVehicleNo = null;
                                 tempDriverName = null;
                                 tempDate = null;
+                                tempEndDate = null;
                                 tempDateController.clear();
-                                tempendDateController.clear();
+                                tempEndDateController.clear();
                               });
                             },
                             child: const Text('Clear All Filters'),
@@ -359,8 +372,8 @@ class _LogPageState extends State<LogPage> {
                         _filterDate = tempDate;
                         _filterEndDate = tempEndDate;
                       });
-                      _applyFilters();
                       Navigator.of(context).pop();
+                      _applyFilters();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
@@ -430,6 +443,7 @@ class _LogPageState extends State<LogPage> {
         ),
       );
     }
+    
     if (_filterEndDate != null) {
       chips.add(
         Chip(
@@ -480,7 +494,7 @@ class _LogPageState extends State<LogPage> {
     });
 
     try {
-      await _logPageData.addLog(
+      final success = await _logPageData.addLog(
         date: _dateController.text,
         vehicleNo: _selectedVehicleNo!,
         driverName: _selectedDriverName!,
@@ -488,12 +502,14 @@ class _LogPageState extends State<LogPage> {
         description: _descriptionController.text,
       );
 
-      _clearForm();
-
-      await _loadLogs();
-      Navigator.of(context).pop();
-
-      _showSuccessSnackBar('Log added successfully!');
+      if (success) {
+        _clearForm();
+        Navigator.of(context).pop();
+        await _loadLogs();
+        _showSuccessSnackBar('Log added successfully!');
+      } else {
+        _showErrorSnackBar('Failed to add log. Please check vehicle and driver details.');
+      }
     } catch (e) {
       _showErrorSnackBar('Failed to add log: $e');
     } finally {
@@ -514,6 +530,7 @@ class _LogPageState extends State<LogPage> {
   }
 
   void _showAddLogBottomSheet() {
+    _clearForm(); // Clear form when opening
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -607,14 +624,7 @@ class _LogPageState extends State<LogPage> {
                         hint: _isLoadingDropdownData
                             ? const Text('Loading vehicles...')
                             : const Text('Select Vehicle Number'),
-                        items: _vehicleNumbers.map<DropdownMenuItem<String>>((
-                          vehicle,
-                        ) {
-                          // Extract the vehicle number based on your data structure
-                          String vehicleNo = vehicle is Map
-                              ? vehicle['vehicle_number']?.toString() ??
-                                    vehicle.toString()
-                              : vehicle.toString();
+                        items: _vehicleNumbers.map<DropdownMenuItem<String>>((vehicleNo) {
                           return DropdownMenuItem<String>(
                             value: vehicleNo,
                             child: Text(vehicleNo),
@@ -647,14 +657,7 @@ class _LogPageState extends State<LogPage> {
                         hint: _isLoadingDropdownData
                             ? const Text('Loading drivers...')
                             : const Text('Select Driver Name'),
-                        items: _driverNames.map<DropdownMenuItem<String>>((
-                          driver,
-                        ) {
-                          // Extract the driver name based on your data structure
-                          String driverName = driver is Map
-                              ? driver['driver_name']?.toString() ??
-                                    driver.toString()
-                              : driver.toString();
+                        items: _driverNames.map<DropdownMenuItem<String>>((driverName) {
                           return DropdownMenuItem<String>(
                             value: driverName,
                             child: Text(driverName),
@@ -684,15 +687,19 @@ class _LogPageState extends State<LogPage> {
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.attach_money),
                         ),
-                        keyboardType: TextInputType.numberWithOptions(
+                        keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter cost';
                           }
-                          if (double.tryParse(value) == null) {
+                          final cost = double.tryParse(value);
+                          if (cost == null) {
                             return 'Please enter a valid number';
+                          }
+                          if (cost < 0) {
+                            return 'Cost cannot be negative';
                           }
                           return null;
                         },
@@ -711,6 +718,9 @@ class _LogPageState extends State<LogPage> {
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter description';
+                          }
+                          if (value.trim().length < 5) {
+                            return 'Description should be at least 5 characters';
                           }
                           return null;
                         },
@@ -886,7 +896,7 @@ class _LogPageState extends State<LogPage> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredLogs.isEmpty
+                : _logs.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -928,9 +938,12 @@ class _LogPageState extends State<LogPage> {
                 : RefreshIndicator(
                     onRefresh: _loadLogs,
                     child: ListView.builder(
-                      itemCount: _filteredLogs.length,
+                      itemCount: _logs.length,
                       itemBuilder: (context, index) {
-                        return _buildLogCard(_filteredLogs[index]);
+                        if (index < _logs.length) {
+                          return _buildLogCard(_logs[index]);
+                        }
+                        return null;
                       },
                     ),
                   ),

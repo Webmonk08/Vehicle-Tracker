@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/pages/Logpage/logPage.dart';
+import 'package:my_app/pages/expense/expensePage.dart';
 import 'pages/Dashboard/Dashboard.dart';
 import 'pages/DriverPage/Driverpage.dart';
 import 'pages/vehiclePage/Homepage.dart';
@@ -45,7 +46,8 @@ class _MainPageState extends State<MainPage> {
     const Dashboard(),
     const Homepage(),
     const DriverPage(),
-    LogPage()
+    LogPage(),
+    ExpensePage(),
   ];
 
   void _selectPage(int index) {
@@ -84,12 +86,16 @@ class _MainPageState extends State<MainPage> {
               title: const Text('Drivers'),
               onTap: () => _selectPage(2),
             ),
-                        ListTile(
-              leading: const Icon(Icons.person),
+            ListTile(
+              leading: const Icon(Icons.dataset),
               title: const Text('LogPage'),
               onTap: () => _selectPage(3),
             ),
-
+            ListTile(
+              leading: const Icon(Icons.currency_rupee),
+              title: const Text('Expense'),
+              onTap: () => _selectPage(4),
+            ),
           ],
         ),
       ),
