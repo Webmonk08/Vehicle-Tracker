@@ -39,14 +39,10 @@ class LogPageData {
     bool isFilterApplied,
   ) async {
     try {
-      print('=== DEBUG INFO ===');
-      print('_isFilterApplied: $isFilterApplied');
-      print('startDate: $startDate');
-      print('endDate: $endDate');
-      print('driverName: $driverName');
-      print('vehicleNo: $vehicleNo');
+      
 
       var query = supabaseClient.from('vehicle_logs').select('''
+            id,
             cost_of_load,
             description,
             log_date,
@@ -88,19 +84,22 @@ class LogPageData {
       print('Response count: ${response.length}');
 
       // Print first few log_dates to see what's actually in the DB
-      for (var log in response) {
-        print("Log entry: $log");
-      }
-      print("");
+      
 
       return response.map((row) {
         final safeRow = <String, dynamic>{
+          'id': row['id'],
           'log_date': row['log_date']?.toString() ?? '',
           'description': row['description']?.toString() ?? '',
           'cost_of_load': _safeConvertToString(row['cost_of_load']),
           'vehicles': row['vehicles'],
           'drivers': row['drivers'],
         };
+
+        for (var log in safeRow.values) {
+        print("Log entry: $log");
+      }
+      print("");
 
         return LogModal.fromMap(safeRow);
       }).toList();
@@ -158,8 +157,8 @@ class LogPageData {
     required String description,
   }) async {
     try {
-      int? vehicleId;
-      int? driverId;
+      String? vehicleId;
+      String? driverId;
 
       print('Adding log for vehicle: $vehicleNo');
 
@@ -174,7 +173,7 @@ class LogPageData {
         print("❌ No vehicle found with number: $vehicleNo");
         return false;
       } else {
-        vehicleId = vehicleRes['id'] as int;
+        vehicleId = vehicleRes['id'];
       }
 
       // Get driver ID
@@ -188,7 +187,7 @@ class LogPageData {
         print("❌ No driver found with name: $driverName");
         return false;
       } else {
-        driverId = driverRes['id'] as int;
+        driverId = driverRes['id'];
       }
 
       // Insert the log
@@ -205,6 +204,87 @@ class LogPageData {
       return true;
     } catch (e) {
       print('❌ Error adding new log: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateLog({
+    required String logId,
+    required String date,
+    required String vehicleNo,
+    required String driverName,
+    required double cost,
+    required String description,
+  }) async {
+    try {
+      String? vehicleId;
+      String? driverId;
+
+      print('Updating log with ID: $logId');
+
+      // Get vehicle ID
+      final vehicleRes = await supabaseClient
+          .from('vehicles')
+          .select('id')
+          .eq('VehicleNo', vehicleNo)
+          .maybeSingle();
+      print("object");
+      if (vehicleRes == null) {
+        print("❌ No vehicle found with number: $vehicleNo");
+        return false;
+      } else {
+        vehicleId = vehicleRes['id'];
+        print("Vehicle $vehicleId");
+      }
+
+      // Get driver ID
+      final driverRes = await supabaseClient
+          .from('drivers')
+          .select('id')
+          .eq('name', driverName)
+          .maybeSingle();
+
+      if (driverRes == null) {
+        print("❌ No driver found with name: $driverName");
+        return false;
+      } else {
+        driverId = driverRes['id'];
+      }
+
+      // Update the log
+      final logData = {
+        'log_date': date,
+        'vehicle_id': vehicleId,
+        'driver_id': driverId,
+        'cost_of_load': cost,
+        'description': description,
+      };
+
+      await supabaseClient
+          .from('vehicle_logs')
+          .update(logData)
+          .eq('id', logId);
+      print(logData);
+      print('✅ Log updated successfully');
+      return true;
+    } catch (e) {
+      print('❌ Error updating log: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteLog(String logId) async {
+    try {
+
+      await supabaseClient
+          .from('vehicle_logs')
+          .delete()
+          .eq('id', logId);
+
+      print('✅ Log deleted successfully');
+      return true;
+    } catch (e) {
+      print('❌ Error deleting log: $e');
       return false;
     }
   }

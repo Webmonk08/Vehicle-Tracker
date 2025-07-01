@@ -59,17 +59,28 @@ class _LogPageState extends State<LogPage> {
 
     try {
       final logs = await _logPageData.getLogs(
-        _filterDate, 
-        _filterEndDate, 
-        _filterDriverName, 
-        _filterVehicleNo, 
-        _isFilterApplied
+        _filterDate,
+        _filterEndDate,
+        _filterDriverName,
+        _filterVehicleNo,
+        _isFilterApplied,
       );
 
       setState(() {
         _logs = logs;
         _isLoading = false;
       });
+
+      for (var log in _logs) {
+        print('--- Log Entry ---');
+        print('ID: ${log.id}');
+        print('Date: ${log.date}');
+        print('Vehicle No: ${log.vehicleNo}');
+        print('Driver Name: ${log.driverName}');
+        print('Cost: ${log.cost_of_load}');
+        print('Description: ${log.description}');
+        print('-----------------');
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -87,7 +98,7 @@ class _LogPageState extends State<LogPage> {
       print("Loading dropdown data...");
       final vehicleNumbers = await _logPageData.getVehicleNumbers();
       final driverNames = await _logPageData.getDriverNames();
-      
+
       setState(() {
         _vehicleNumbers = vehicleNumbers;
         _driverNames = driverNames;
@@ -102,10 +113,57 @@ class _LogPageState extends State<LogPage> {
     }
   }
 
+  Future<void> _confirmDeleteLog(String logId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this log?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteLog(logId);
+    }
+  }
+
+  Future<void> _deleteLog(String logId) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await _logPageData.deleteLog(logId);
+      if (success) {
+        _showSuccessSnackBar('Log deleted successfully!');
+        await _loadLogs();
+      } else {
+        _showErrorSnackBar('Failed to delete log');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error deleting log: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _applyFilters() async {
     setState(() {
       _isLoading = true;
-      _isFilterApplied = _filterVehicleNo != null ||
+      _isFilterApplied =
+          _filterVehicleNo != null ||
           _filterDriverName != null ||
           _filterDate != null ||
           _filterEndDate != null;
@@ -118,12 +176,12 @@ class _LogPageState extends State<LogPage> {
       _filterVehicleNo,
       _isFilterApplied,
     );
-    
+
     setState(() {
       _logs = logs;
       _isLoading = false;
     });
-    
+
     print("Filtered logs count: ${_logs.length}");
   }
 
@@ -145,6 +203,288 @@ class _LogPageState extends State<LogPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => _buildFilterBottomSheet(),
     );
+  }
+
+  bool _isUpdatingLog = false;
+  String? _editingLogId;
+
+  void _showEditLogBottomSheet(LogModal log) {
+    _editingLogId = log.id;
+    _dateController.text = log.date;
+    _costController.text = log.cost_of_load.toString();
+    _descriptionController.text = log.description;
+    setState(() {
+      _selectedVehicleNo = log.vehicleNo;
+      _selectedDriverName = log.driverName;
+    });
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildEditLogBottomSheet(),
+    );
+  }
+
+  Widget _buildEditLogBottomSheet() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Edit Log',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Form fields
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Date field
+                      TextFormField(
+                        controller: _dateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Date',
+                          hintText: 'YYYY-MM-DD',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a date';
+                          }
+                          return null;
+                        },
+                        onTap: () async {
+                          DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2101),
+                          );
+                          if (pickedDate != null) {
+                            _dateController.text =
+                                "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                          }
+                        },
+                        readOnly: true,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Vehicle Number dropdown
+                      DropdownButtonFormField<String>(
+                        value: _selectedVehicleNo,
+                        decoration: const InputDecoration(
+                          labelText: 'Vehicle Number',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.directions_car),
+                        ),
+                        hint: _isLoadingDropdownData
+                            ? const Text('Loading vehicles...')
+                            : const Text('Select Vehicle Number'),
+                        items: _vehicleNumbers.map<DropdownMenuItem<String>>((
+                          vehicleNo,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: vehicleNo,
+                            child: Text(vehicleNo),
+                          );
+                        }).toList(),
+                        onChanged: _isLoadingDropdownData
+                            ? null
+                            : (String? newValue) {
+                                setState(() {
+                                  _selectedVehicleNo = newValue;
+                                });
+                              },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a vehicle number';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Driver Name dropdown
+                      DropdownButtonFormField<String>(
+                        value: _selectedDriverName,
+                        decoration: const InputDecoration(
+                          labelText: 'Driver Name',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        hint: _isLoadingDropdownData
+                            ? const Text('Loading drivers...')
+                            : const Text('Select Driver Name'),
+                        items: _driverNames.map<DropdownMenuItem<String>>((
+                          driverName,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: driverName,
+                            child: Text(driverName),
+                          );
+                        }).toList(),
+                        onChanged: _isLoadingDropdownData
+                            ? null
+                            : (String? newValue) {
+                                setState(() {
+                                  _selectedDriverName = newValue;
+                                });
+                              },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a driver name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Cost field
+                      TextFormField(
+                        controller: _costController,
+                        decoration: const InputDecoration(
+                          labelText: 'Cost',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter cost';
+                          }
+                          final cost = double.tryParse(value);
+                          if (cost == null) {
+                            return 'Please enter a valid number';
+                          }
+                          if (cost < 0) {
+                            return 'Cost cannot be negative';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Description field
+                      TextFormField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.description),
+                        ),
+                        maxLines: 3,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter description';
+                          }
+                          if (value.trim().length < 5) {
+                            return 'Description should be at least 5 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Update button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isUpdatingLog ? null : _updateLog,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: _isUpdatingLog
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Update Log',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateLog() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_editingLogId == null) return;
+
+    setState(() {
+      _isUpdatingLog = true;
+    });
+
+    try {
+      final success = await _logPageData.updateLog(
+        logId: _editingLogId!,
+        date: _dateController.text,
+        vehicleNo: _selectedVehicleNo!,
+        driverName: _selectedDriverName!,
+        cost: double.tryParse(_costController.text) ?? 0,
+        description: _descriptionController.text,
+      );
+
+      if (success) {
+        _clearForm();
+        Navigator.of(context).pop();
+        await _loadLogs();
+        _showSuccessSnackBar('Log updated successfully!');
+      } else {
+        _showErrorSnackBar(
+          'Failed to update log. Please check vehicle and driver details.',
+        );
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to update log: $e');
+    } finally {
+      setState(() {
+        _isUpdatingLog = false;
+        _editingLogId = null;
+      });
+    }
   }
 
   Widget _buildFilterBottomSheet() {
@@ -214,7 +554,9 @@ class _LogPageState extends State<LogPage> {
                               value: null,
                               child: Text('All Vehicles'),
                             ),
-                            ..._vehicleNumbers.map<DropdownMenuItem<String>>((vehicleNo) {
+                            ..._vehicleNumbers.map<DropdownMenuItem<String>>((
+                              vehicleNo,
+                            ) {
                               return DropdownMenuItem<String>(
                                 value: vehicleNo,
                                 child: Text(vehicleNo),
@@ -243,7 +585,9 @@ class _LogPageState extends State<LogPage> {
                               value: null,
                               child: Text('All Drivers'),
                             ),
-                            ..._driverNames.map<DropdownMenuItem<String>>((driverName) {
+                            ..._driverNames.map<DropdownMenuItem<String>>((
+                              driverName,
+                            ) {
                               return DropdownMenuItem<String>(
                                 value: driverName,
                                 child: Text(driverName),
@@ -297,7 +641,7 @@ class _LogPageState extends State<LogPage> {
                           readOnly: true,
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // End Date filter
                         TextFormField(
                           controller: tempEndDateController,
@@ -443,7 +787,7 @@ class _LogPageState extends State<LogPage> {
         ),
       );
     }
-    
+
     if (_filterEndDate != null) {
       chips.add(
         Chip(
@@ -508,7 +852,9 @@ class _LogPageState extends State<LogPage> {
         await _loadLogs();
         _showSuccessSnackBar('Log added successfully!');
       } else {
-        _showErrorSnackBar('Failed to add log. Please check vehicle and driver details.');
+        _showErrorSnackBar(
+          'Failed to add log. Please check vehicle and driver details.',
+        );
       }
     } catch (e) {
       _showErrorSnackBar('Failed to add log: $e');
@@ -624,7 +970,9 @@ class _LogPageState extends State<LogPage> {
                         hint: _isLoadingDropdownData
                             ? const Text('Loading vehicles...')
                             : const Text('Select Vehicle Number'),
-                        items: _vehicleNumbers.map<DropdownMenuItem<String>>((vehicleNo) {
+                        items: _vehicleNumbers.map<DropdownMenuItem<String>>((
+                          vehicleNo,
+                        ) {
                           return DropdownMenuItem<String>(
                             value: vehicleNo,
                             child: Text(vehicleNo),
@@ -657,7 +1005,9 @@ class _LogPageState extends State<LogPage> {
                         hint: _isLoadingDropdownData
                             ? const Text('Loading drivers...')
                             : const Text('Select Driver Name'),
-                        items: _driverNames.map<DropdownMenuItem<String>>((driverName) {
+                        items: _driverNames.map<DropdownMenuItem<String>>((
+                          driverName,
+                        ) {
                           return DropdownMenuItem<String>(
                             value: driverName,
                             child: Text(driverName),
@@ -818,6 +1168,22 @@ class _LogPageState extends State<LogPage> {
                     log.description,
                     style: const TextStyle(color: Colors.grey),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  color: Colors.blue,
+                  onPressed: () => _showEditLogBottomSheet(log),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20),
+                  color: Colors.red,
+                  onPressed: () => _confirmDeleteLog(log.id),
                 ),
               ],
             ),

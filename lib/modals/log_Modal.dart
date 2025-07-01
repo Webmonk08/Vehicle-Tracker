@@ -1,4 +1,7 @@
+import 'package:uuid/uuid.dart';
+
 class LogModal {
+  final String id;
   final String date;
   final String vehicleNo;
   final String driverName;
@@ -6,15 +9,17 @@ class LogModal {
   final String description;
 
   LogModal({
+    String? id,
     required this.date,
     required this.vehicleNo,
     required this.driverName,
     required this.cost_of_load,
     required this.description,
-  });
+  }) : id = id ?? const Uuid().v4();
 
   factory LogModal.fromMap(Map<String, dynamic> map) {
     return LogModal(
+      id: map['id'].toString(),
       date: map['log_date']?.toString() ?? '',
       description: map['description']?.toString() ?? '',
 
@@ -43,6 +48,7 @@ class LogModal {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'log_date': date,
       'vehicle_id': vehicleNo,
       'driver_id': driverName,
